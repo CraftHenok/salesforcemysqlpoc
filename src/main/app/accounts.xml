@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+    <flow name="getSFDCAccountsFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/getall" allowedMethods="GET" doc:name="HTTP"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="dsql:SELECT Id,Name,NumberOfEmployees,OwnerId,ShippingState,ShippingStreet FROM Account" doc:name="Salesforce"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:input-payload doc:sample="sample_data\list_Account.dwl"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+ payload map  ((item,index) ->
+	{
+		Name : payload[index].Name,
+				Id : payload[index].Id
+	}
+)]]></dw:set-payload>
+        </dw:transform-message>
+        <logger level="INFO" doc:name="Logger"/>
+    </flow>
+      <flow name="createSFDCAccountFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/create" doc:name="HTTP"/>
+        <db:select config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[SELECT * FROM batchseven.accountsync]]></db:parameterized-query>
+        </db:select>
+        <foreach doc:name="For Each">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:input-payload doc:sample="sample_data\map.dwl"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	Name:payload.name
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <sfdc:create-single config-ref="Salesforce__Basic_Authentication" type="Account" doc:name="Salesforce"/>
+            <logger message="Inserted sucessfully. #[message.payloadAs(java.lang.String)]" level="INFO" doc:name="logResponseFromSalesforce"/>
+            <dw:transform-message doc:name="prepareResponse">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"id": payload[0].id,
+	"success": payload[0].success,
+	"created": payload[0].created
+}]]></dw:set-payload>
+            </dw:transform-message>
+        </foreach>
+    </flow>
+    <flow name="createmysqlfromSFDCAccountFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/createtomysql" doc:name="HTTP"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="dsql:SELECT Id,Name,NumberOfEmployees,OwnerId,ShippingState,ShippingStreet FROM Account" doc:name="Salesforce"/>
+        <foreach doc:name="For Each">
+            <set-payload value="#[payload.Name]" doc:name="Set Payload"/>
+            <db:insert config-ref="MySQL_Configuration" doc:name="Database">
+                <db:parameterized-query><![CDATA[INSERT INTO `batchseven`.`accountsync` (`name`) VALUES (#[payload]);]]></db:parameterized-query>
+            </db:insert>
+            <logger message="Inserted sucessfully. #[message.payloadAs(java.lang.String)]" level="INFO" doc:name="logResponseFrommysql"/>
+        </foreach>
+    </flow>
+
+    
+</mule>
