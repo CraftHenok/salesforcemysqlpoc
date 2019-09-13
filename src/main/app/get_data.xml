@@ -8,8 +8,9 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
 http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <sfdc:config name="Salesforce__Basic_Authentication1" username="henok@craftsoft.com" password="Test@123" securityToken="GimGGePLCUOVsGJ2NynyBlFz" doc:name="Salesforce: Basic Authentication"/>
     <flow name="data_getSFDCAccountsFlow">
-        <http:listener config-ref="HTTP_Listener_Configuration" path="/getall" allowedMethods="GET" doc:name="data_HTTP"/>
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/getaccount" allowedMethods="GET" doc:name="data_HTTP"/>
         <sfdc:query config-ref="Salesforce__Basic_Authentication" query="dsql:SELECT Id,Name,NumberOfEmployees,OwnerId,ShippingState,ShippingStreet FROM Account" doc:name="data_Salesforce"/>
         <dw:transform-message doc:name="data_Transform Message">
             <dw:input-payload doc:sample="sample_data\list_Account.dwl"/>
@@ -23,6 +24,17 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
 	}
 )]]></dw:set-payload>
         </dw:transform-message>
-        <logger level="INFO" doc:name="data_Logger"/>
+        <logger level="INFO" doc:name="data_Logger" message="#[payload]"/>
+    </flow>
+    <flow name="get_dataFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/getcontact" doc:name="HTTP"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="dsql:SELECT AssistantName,FirstName,HomePhone,Title FROM Contact" doc:name="Salesforce"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
     </flow>
 </mule>

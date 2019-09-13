@@ -28,10 +28,22 @@ http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/cu
         </dw:transform-message>
         <logger level="INFO" doc:name="Logger"/>
     </flow>
+    <flow name="deleteFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/delete" doc:name="HTTP"/>
+        <db:select config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[SELECT * FROM salesforceintegration.accountsync]]></db:parameterized-query>
+        </db:select>
+        <foreach doc:name="For Each">
+            <sfdc:hard-delete-bulk config-ref="Salesforce__Basic_Authentication" type="Account" doc:name="Salesforce">
+                <sfdc:objects ref="#[payload]"/>
+            </sfdc:hard-delete-bulk>
+            <logger message="Deleted " level="INFO" doc:name="Logger"/>
+        </foreach>
+    </flow>
       <flow name="createSFDCAccountFlow">
         <http:listener config-ref="HTTP_Listener_Configuration" path="/create" doc:name="HTTP"/>
         <db:select config-ref="MySQL_Configuration" doc:name="Database">
-            <db:parameterized-query><![CDATA[SELECT * FROM batchseven.accountsync]]></db:parameterized-query>
+            <db:parameterized-query><![CDATA[SELECT * FROM salesforceintegration.accountsync]]></db:parameterized-query>
         </db:select>
         <foreach doc:name="For Each">
             <dw:transform-message doc:name="Transform Message">
@@ -44,7 +56,7 @@ http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/cu
 }]]></dw:set-payload>
             </dw:transform-message>
             <sfdc:create-single config-ref="Salesforce__Basic_Authentication" type="Account" doc:name="Salesforce"/>
-            <logger message="Inserted sucessfully. #[message.payloadAs(java.lang.String)]" level="INFO" doc:name="logResponseFromSalesforce"/>
+            <logger message="Inserted sucessfully. " level="INFO" doc:name="logResponseFromSalesforce"/>
             <dw:transform-message doc:name="prepareResponse">
                 <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
@@ -63,7 +75,7 @@ http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/cu
         <foreach doc:name="For Each">
             <set-payload value="#[payload.Name]" doc:name="Set Payload"/>
             <db:insert config-ref="MySQL_Configuration" doc:name="Database">
-                <db:parameterized-query><![CDATA[INSERT INTO `batchseven`.`accountsync` (`name`) VALUES (#[payload]);]]></db:parameterized-query>
+                <db:parameterized-query><![CDATA[INSERT INTO `salesforceintegration`.`accountsync` (`name`) VALUES (#[payload]);]]></db:parameterized-query>
             </db:insert>
             <logger message="Inserted sucessfully. #[message.payloadAs(java.lang.String)]" level="INFO" doc:name="logResponseFrommysql"/>
         </foreach>
